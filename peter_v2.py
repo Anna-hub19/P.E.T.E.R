@@ -83,10 +83,10 @@ PRIORIDADE = ("readme.md", "package.json", "pom.xml", "program.cs", "main.py", "
 SITES = {"github": "https://github.com", "linkedin": "https://www.linkedin.com/jobs/",
          "youtube": "https://www.youtube.com", "gmail": "https://mail.google.com",
          "stack overflow": "https://stackoverflow.com", "claude": "https://claude.ai",
-         "chatgpt": "https://chatgpt.com", "google": "https://www.google.com"}
+         "chatgpt": "https://chatgpt.com", "google": "https://www.google.com", "whatsapp":"https://web.whatsapp.com/"}
 PROGRAMAS = {"vs code": "code", "vscode": "code", "visual studio code": "code", "terminal": "start powershell",
              "bloco de notas": "notepad", "calculadora": "calc", "explorador": "explorer", "chrome": "start chrome","pomodoro": r'start "" "C:\Users\Usuario\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\apps do Chrome\Pomodoro timer.lnk"'}
-PROTOCOLOS = {"spotify": ("spotify:", "https://open.spotify.com"), "whatsapp": ("whatsapp:", "https://web.whatsapp.com"),
+PROTOCOLOS = {"spotify": ("spotify:", "https://open.spotify.com"),
               "discord": ("discord:", "https://discord.com/app")}
 
 BASE = (f"Você é o {NOME}, assistente pessoal de uma desenvolvedora júnior full stack. "
