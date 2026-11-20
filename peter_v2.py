@@ -48,23 +48,10 @@ NOME = "Peter"   # nome do assistente (aparece na tela e no prompt)
 USUARIO = "Bia"   # como o assistente chama você nas saudações
 CIDADE = {"nome": "Aracaju", "lat": -10.9091, "lon": -37.0677}   # para a previsão do tempo
 TEMA = "tech"      # "tech" (painel futurista) ou "peter" (vermelho e azul, quadrinhos)
-APELIDOS = ["peter",
-    "péter",
-    "pêter",
-    "piter",
-    "pitter",
-    "piiter",
-    "pieter",
-    "pitera",
-    "pitra",
-    "pítera",
-    "píter",
-    "piterá",
-    "píter ia",
-    "peter ia",
-    "piti",
-    "pitero",
-    "petero"]   # como o reconhecimento de voz costuma escrever o nome
+APELIDOS = ["peter", "péter", "pêter", "piter", "pitter", "piiter", "pieter", "pitera", "pitra", "pítera", "píter",
+            "piterá", "píter ia", "peter ia", "piti", "pitero", "petero"]   # como o reconhecimento de voz costuma escrever o nome
+FONETICA = ["piter", "peter"]   # base do reconhecimento aproximado do nome (aceita variações de 1 letra)
+NOME_FALA = "Píter"             # como a voz deve pronunciar o nome
 PASTA = Path.home() / ".jarvis"
 ARQ = PASTA / "tarefas.json"
 CFG = PASTA / "config.json"
@@ -83,15 +70,21 @@ PRIORIDADE = ("readme.md", "package.json", "pom.xml", "program.cs", "main.py", "
 SITES = {"github": "https://github.com", "linkedin": "https://www.linkedin.com/jobs/",
          "youtube": "https://www.youtube.com", "gmail": "https://mail.google.com",
          "stack overflow": "https://stackoverflow.com", "claude": "https://claude.ai",
-         "chatgpt": "https://chatgpt.com", "google": "https://www.google.com", "whatsapp":"https://web.whatsapp.com/"}
+         "chatgpt": "https://chatgpt.com", "google": "https://www.google.com", "whatsapp": "https://web.whatsapp.com/",
+         "netflix": "https://www.netflix.com/browse"}
+APENAS_SITE = ["whatsapp", "netflix"]   # não tenho o aplicativo: abre sempre o site
+ALIAS_SITES = {"whatsapp": ["whats app", "whatsap", "watsapp", "uatsapp", "zap zap", "zapzap", "zap"],
+               "youtube": ["you tube"], "linkedin": ["linked in"], "github": ["git hub"], "chatgpt": ["chat gpt"],
+               "stack overflow": ["stackoverflow"], "netflix": ["netflis"]}
 PROGRAMAS = {"vs code": "code", "vscode": "code", "visual studio code": "code", "terminal": "start powershell",
-             "bloco de notas": "notepad", "calculadora": "calc", "explorador": "explorer", "chrome": "start chrome","pomodoro": r'start "" "C:\Users\Usuario\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\apps do Chrome\Pomodoro timer.lnk"'}
+             "bloco de notas": "notepad", "calculadora": "calc", "explorador": "explorer", "chrome": "start chrome",
+             "pomodoro": r'start "" "C:\Users\Usuario\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\apps do Chrome\Pomodoro timer.lnk"'}
 PROTOCOLOS = {"spotify": ("spotify:", "https://open.spotify.com"),
               "discord": ("discord:", "https://discord.com/app")}
 
 BASE = (f"Você é o {NOME}, assistente pessoal de uma desenvolvedora júnior full stack. "
         "Responda sempre em português do Brasil, de forma curta e direta, como numa conversa falada "
-        "(no máximo 4 frases). Quando mostrar código, use blocos ``` e explique em 1 ou 2 frases. "  
+        "(no máximo 4 frases). Quando mostrar código, use blocos ``` e explique em 1 ou 2 frases. "
         "Você roda dentro de um programa que executa comandos como: abrir github, abrir linkedin, abrir vs code, "
         "vagas de <área>, anote tarefa <texto>. Se o usuário pedir algo assim, diga o comando "
         "exato a usar; nunca diga que não consegue abrir sites ou programas. "
@@ -117,7 +110,13 @@ EDITE ESTE ARQUIVO com seus dados completos. O assistente usa só o que estiver 
 if not CURR.exists():
     CURR.write_text(MODELO_CURRICULO, "utf-8")
 
-origem = Path(sys.argv[1] if len(sys.argv) > 1 else "peterApp.py")
+_args = sys.argv[1:]
+HORA_TESTE = None          # python jarvis_v2.py --hora 8   (simula 8h da manhã para testar o briefing)
+if "--hora" in _args:
+    _i = _args.index("--hora")
+    HORA_TESTE = int(_args[_i + 1]) % 24
+    del _args[_i:_i + 2]
+origem = Path(_args[0] if _args else "peterApp.py")
 HTML = re.search(r'HTML = r"""(.*?)"""', origem.read_text("utf-8"), re.S).group(1)
 
 # ------------------------------------------------------------------ ajustes da interface
@@ -142,13 +141,31 @@ const ATIVA=/\b(__ATIVA__)\b/i;
 function bip(){try{const c=new AudioContext(),o=c.createOscillator(),g=c.createGain();o.frequency.value=880;g.gain.value=.08;o.connect(g);g.connect(c.destination);o.start();o.stop(c.currentTime+.12)}catch(e){}}
 function retomar(){if(escuta&&!pausa&&recW){try{recW.start()}catch(e){}}}
 function pausar(){pausa=true;if(recW){try{recW.stop()}catch(e){}}}
+const FON=__FONETICA__;
+function lev(a,b){const d=[];for(let i=0;i<=a.length;i++)d[i]=[i];for(let j=1;j<=b.length;j++)d[0][j]=j;
+ for(let i=1;i<=a.length;i++)for(let j=1;j<=b.length;j++)d[i][j]=Math.min(d[i-1][j]+1,d[i][j-1]+1,d[i-1][j-1]+(a[i-1]===b[j-1]?0:1));
+ return d[a.length][b.length]}
+const letras=w=>norm(w).replace(/[^a-z]/g,"");
+function parecido(w){return w.length>=4&&w.length<=8&&w[0]==="p"&&FON.some(f=>lev(w,f)<=1)}
+function achaNome(t){
+ const ps=t.split(/\s+/).filter(Boolean),ns=ps.map(letras);
+ for(let i=0;i<ps.length;i++){
+  if(parecido(ns[i]))return{fim:i+1};
+  if(i+1<ps.length&&ns[i][0]==="p"&&parecido(ns[i]+ns[i+1]))return{fim:i+2}}
+ const m=t.match(ATIVA);return m?{resto:t.slice(m.index+m[0].length)}:null}
+function textoApos(a,r){return r.resto!==undefined?r.resto:a.split(/\s+/).filter(Boolean).slice(r.fim).join(" ")}
 function criarEscuta(){
- recW=new SR();recW.lang="pt-BR";recW.continuous=true;recW.interimResults=false;
+ recW=new SR();recW.lang="pt-BR";recW.continuous=true;recW.interimResults=false;recW.maxAlternatives=5;
  recW.onresult=e=>{for(let i=e.resultIndex;i<e.results.length;i++){
-  if(!e.results[i].isFinal)continue;const t=e.results[i][0].transcript.trim();if(!t)continue;
+  if(!e.results[i].isFinal)continue;
+  const alts=[];for(let j=0;j<e.results[i].length;j++)alts.push(e.results[i][j].transcript.trim());
+  const t=alts[0];if(!t)continue;
   if(aguardando){aguardando=false;enviar(t);continue}
-  const m=t.match(ATIVA);if(!m)continue;
-  const resto=t.slice(m.index+m[0].length).replace(/^[\s,.:;!?-]+/,"");
+  let resto=null;
+  for(const a of alts){const r=achaNome(a);if(r){resto=textoApos(a,r);break}}
+  if(resto===null){clearTimeout(window.__ouvT);$("#estado").textContent="Ouvi: “"+t.slice(0,38)+"”";
+   window.__ouvT=setTimeout(()=>{if(escuta&&!aguardando)$("#estado").textContent="Diga “__NOME__”..."},4000);continue}
+  resto=resto.replace(/^[\s,.:;!?-]+/,"").replace(/^(?:ia|i a)\b[\s,.:;!?-]*/i,"");
   bip();
   if(resto.length>2){enviar(resto)}
   else{aguardando=true;set("ouvindo","Pois não? Pode falar...");
@@ -163,7 +180,7 @@ const _set=set,_falar=falar,_ouvir=ouvir;
 set=function(e,t){_set(e,t);
  if(!e){if(pausa){pausa=false;setTimeout(retomar,400)}
   if(escuta&&!aguardando)$("#estado").textContent="Diga “__NOME__”..."}};
-falar=function(t){if(escuta)pausar();_falar(t)};
+falar=function(t){if(escuta)pausar();_falar((t||"").replace(/\bpeter\b/gi,"__NOME_FALA__"))};
 ouvir=function(){if(escuta)pausar();_ouvir()};
 (function(){
  const b=document.createElement("button");b.className="chip";b.id="escuta";
@@ -171,7 +188,7 @@ ouvir=function(){if(escuta)pausar();_ouvir()};
  b.onclick=()=>{
   if(!SR){bolha("Seu navegador não suporta voz. Use Chrome ou Edge.","j");return}
   escuta=!escuta;
-  if(escuta){pausa=false;criarEscuta();(window.__auto?retomar():falar("Estou ouvindo. É só dizer piter."))}
+  if(escuta){pausa=false;criarEscuta();(window.__auto?retomar():falar("Estou ouvindo. É só dizer __NOME__."))}
   else{aguardando=false;pausa=false;try{recW.stop()}catch(e){}}
   atualizar()};
  atualizar();$("#orb").onclick=ouvir;
@@ -212,8 +229,10 @@ enviar=async function(texto){
 function mostrarBriefing(b){
  $("#dica")?.remove();const d=document.createElement("div");d.className="brief";
  d.innerHTML='<div class="brief-h"><span class="pulso"></span>'+esc(b.titulo)+'</div>'+b.itens.map(i=>
-  '<div class="brief-i"><b>'+esc(i.titulo)+'</b>'+((i.lista&&i.lista.length)?'<ul>'+i.lista.map(x=>'<li>'+esc(x)+'</li>').join("")+'</ul>':
-  (i.texto?'<p>'+esc(i.texto)+'</p>':""))+'</div>').join("");
+  '<div class="brief-i"><b>'+esc(i.titulo)+'</b>'+((i.noticias&&i.noticias.length)?i.noticias.map(n=>
+   '<div class="nb">'+(n.link?'<a href="'+n.link.replace(/"/g,"&quot;")+'" target="_blank" rel="noopener">'+esc(n.titulo)+'</a>':'<span class="nt">'+esc(n.titulo)+'</span>')+
+   (n.resumo?'<p>'+esc(n.resumo)+'</p>':"")+(n.fonte?'<small>'+esc(n.fonte)+'</small>':"")+'</div>').join(""):
+  ((i.lista&&i.lista.length)?'<ul>'+i.lista.map(x=>'<li>'+esc(x)+'</li>').join("")+'</ul>':(i.texto?'<p>'+esc(i.texto)+'</p>':"")))+'</div>').join("");
  $("#msgs").append(d);$("#msgs").scrollTop=1e9}
 async function briefing(){
  try{set("pensando","Preparando seu briefing...");
@@ -222,7 +241,8 @@ async function briefing(){
 setTimeout(briefing,2200);
 carregar();
 """
-ESCUTA_JS = ESCUTA_JS.replace("__ATIVA__", "|".join(APELIDOS)).replace("__NOME__", NOME)
+ESCUTA_JS = (ESCUTA_JS.replace("__ATIVA__", "|".join(sorted(APELIDOS, key=len, reverse=True))).replace("__NOME__", NOME)
+             .replace("__FONETICA__", json.dumps(FONETICA)).replace("__NOME_FALA__", NOME_FALA))
 HTML = HTML.replace("</script></body></html>", ESCUTA_JS + EXTRA_JS + "</script></body></html>")
 
 # 3) visual: tema inspirado no Peter Parker (vermelho e azul, teia, quadrinhos) e sem o modo foco
@@ -360,6 +380,9 @@ input::placeholder{color:#6f7db0}
 .brief-i{padding:8px 0;border-top:1px solid #ffffff14}
 .brief-i b{display:block;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--mudo);margin-bottom:2px}
 .brief-i p{margin:0}.brief-i ul{margin:2px 0 0 18px;padding:0}.brief-i li{margin:3px 0}
+.nb{margin:8px 0;padding:9px 12px;border-left:3px solid var(--rubro);background:#ffffff09}
+.nb a,.nb .nt{color:var(--azul);font-weight:600;text-decoration:none}.nb a:hover{text-decoration:underline}
+.nb p{margin:4px 0 2px;font-size:14px}.nb small{color:var(--mudo);font-size:11px;letter-spacing:.06em}
 .pulso{width:8px;height:8px;border-radius:50%;background:var(--ok);box-shadow:0 0 8px var(--ok);animation:pulso 1.4s infinite}
 .dica p:first-child{color:#fff;font:italic 900 34px Impact,"Arial Black",sans-serif;letter-spacing:2px;text-shadow:3px 3px 0 var(--rubro)}
 """
@@ -403,12 +426,14 @@ def so_codigo(t):
     return (m.group(1) if m else t).strip("\n") + "\n"
 
 
-def ollama(msgs, system, tokens=350, ctx=4096):
-    corpo = json.dumps({"model": MODELO, "stream": False, "think": False, "keep_alive": "30m",
-                        "options": {"num_ctx": ctx, "num_predict": tokens},
+def ollama(msgs, system, tokens=350, ctx=4096, espera=300, temperatura=None):
+    opcoes = {"num_ctx": ctx, "num_predict": tokens}
+    if temperatura is not None:
+        opcoes["temperature"] = temperatura
+    corpo = json.dumps({"model": MODELO, "stream": False, "think": False, "keep_alive": "30m", "options": opcoes,
                         "messages": [{"role": "system", "content": system}] + msgs}).encode()
     req = urllib.request.Request(f"{OLLAMA}/api/chat", corpo, {"Content-Type": "application/json"})
-    with urllib.request.urlopen(req, timeout=300) as r:
+    with urllib.request.urlopen(req, timeout=espera) as r:
         return json.loads(r.read())["message"]["content"].strip()
 
 
@@ -771,8 +796,23 @@ def spotify_api_tocar(uri):
     return False, f"O Spotify respondeu com o erro {status}."
 
 
+def protocolo_instalado(proto):
+    """True se existe um aplicativo registrado para o protocolo (spotify:, discord:...). Evita a janela 'obter um app'."""
+    try:
+        import winreg
+        winreg.CloseKey(winreg.OpenKey(winreg.HKEY_CLASSES_ROOT, proto.rstrip(":")))
+        return True
+    except ImportError:
+        return True
+    except OSError:
+        return False
+
+
 def tocar_spotify(item, nome):
     """Abre o Spotify (se estiver fechado) e toca a playlist. Diz a verdade sobre o resultado."""
+    if not protocolo_instalado("spotify:"):
+        webbrowser.open(item["web"])
+        return R("Não achei o aplicativo do Spotify instalado, então abri a playlist na web. É só clicar em play.")
     try:
         if not spotify_rodando():
             os.startfile("spotify:")
@@ -815,8 +855,12 @@ FEEDS = {"mundo": ["https://feeds.bbci.co.uk/portuguese/rss.xml", "https://g1.gl
                         "https://olhardigital.com.br/feed/"]}
 
 
+def hora_atual():
+    return HORA_TESTE if HORA_TESTE is not None else datetime.now().hour
+
+
 def periodo_do_dia(hora=None):
-    hora = datetime.now().hour if hora is None else hora
+    hora = hora_atual() if hora is None else hora
     return "manha" if 5 <= hora < 12 else "tarde" if 12 <= hora < 18 else "noite"
 
 
@@ -849,19 +893,45 @@ def previsao():
         return None
 
 
-def manchetes(categoria, n=3):
-    """Primeiras manchetes de feeds RSS (usa o primeiro feed que responder)."""
+def _resumo_curto(desc, titulo, limite=230):
+    """Resumo de uma notícia a partir do trecho do próprio feed (sem inventar nada)."""
+    t = re.sub(r"<[^>]+>", " ", html.unescape(desc or ""))
+    t = re.sub(r"\s+", " ", html.unescape(t)).strip()
+    t = re.sub(r"\s*(?:The post .*? appeared first on .*|O post .*? apareceu primeiro (?:em|no|na) .*)$", "", t, flags=re.I)
+    t = re.sub(r"\s*(?:Leia mais|Saiba mais|Continue lendo|Read more)\b.*$", "", t, flags=re.I).strip()
+    if len(t) < 25 or _sem_acento(t)[:40] == _sem_acento(titulo)[:40]:
+        return ""
+    if len(t) > limite:
+        corte = t.rfind(". ", 0, limite)
+        t = t[:corte + 1] if corte > 60 else t[:limite].rsplit(" ", 1)[0] + "…"
+    return t
+
+
+def noticias_itens(categoria, n=3):
+    """Notícias do primeiro feed RSS que responder: título, link, resumo curto e fonte."""
     for url in FEEDS[categoria]:
         try:
             req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 Peter"})
             with urllib.request.urlopen(req, timeout=8) as r:
                 raiz = ET.fromstring(r.read())
-            titulos = [html.unescape(i.findtext("title").strip()) for i in raiz.iter("item") if i.findtext("title")]
-            if titulos:
-                return titulos[:n]
+            itens = []
+            for i in raiz.iter("item"):
+                titulo = html.unescape((i.findtext("title") or "").strip())
+                if not titulo:
+                    continue
+                link = (i.findtext("link") or "").strip()
+                link = link if link.startswith(("http://", "https://")) else ""
+                itens.append({"titulo": titulo, "link": link, "resumo": _resumo_curto(i.findtext("description"), titulo),
+                              "fonte": urllib.parse.urlparse(link).netloc.replace("www.", "")})
+            if itens:
+                return itens[:n]
         except Exception:
             continue
     return []
+
+
+def manchetes(categoria, n=3):
+    return [i["titulo"] for i in noticias_itens(categoria, n)]
 
 
 def tarefas_pendentes_hoje():
@@ -871,23 +941,25 @@ def tarefas_pendentes_hoje():
 
 def montar_briefing(forcar=False):
     agora = datetime.now()
-    p, hoje = periodo_do_dia(agora.hour), f"{agora:%Y-%m-%d}"
-    ja_deu = BRIEF_ARQ.exists() and json.loads(BRIEF_ARQ.read_text("utf-8")).get("data") == hoje
+    p, hoje = periodo_do_dia(), f"{agora:%Y-%m-%d}"
+    ja_deu = HORA_TESTE is None and BRIEF_ARQ.exists() and json.loads(BRIEF_ARQ.read_text("utf-8")).get("data") == hoje
     completo = forcar or (p == "manha" and not ja_deu)
     itens = [{"titulo": {"manha": "Bom dia", "tarde": "Boa tarde", "noite": "Boa noite"}[p],
-              "texto": saudacao(p, agora.hour), "fala": saudacao(p, agora.hour)}]
+              "texto": saudacao(p, hora_atual()), "fala": saudacao(p, hora_atual())}]
     if completo:
         with ThreadPoolExecutor(3) as ex:
-            f_t, f_m, f_x = ex.submit(previsao), ex.submit(manchetes, "mundo"), ex.submit(manchetes, "tecnologia")
+            f_t, f_m, f_x = ex.submit(previsao), ex.submit(noticias_itens, "mundo"), ex.submit(noticias_itens, "tecnologia")
             tempo, mundo, tech = f_t.result(), f_m.result(), f_x.result()
         itens.append({"titulo": "Previsão do tempo", "texto": tempo or "Não consegui a previsão do tempo agora.",
                       "fala": tempo or "Não consegui a previsão do tempo agora."})
         for chave, titulo, lista in (("No mundo", "Mundo", mundo), ("Em tecnologia", "Tecnologia", tech)):
-            itens.append({"titulo": titulo, "lista": lista,
-                          "texto": "" if lista else f"Não consegui carregar as notícias de {titulo.lower()} agora.",
-                          "fala": f"{chave}: " + "; ".join(lista) + "." if lista else
-                          f"Não consegui carregar as notícias de {titulo.lower()} agora."})
-        BRIEF_ARQ.write_text(json.dumps({"data": hoje}), "utf-8")
+            msg = f"Não consegui carregar as notícias de {titulo.lower()} agora."
+            itens.append({"titulo": titulo, "noticias": lista, "texto": "" if lista else msg,
+                          "fala": f"{chave}: " + "; ".join(x["titulo"] for x in lista) + "." if lista else msg})
+        if mundo or tech:
+            itens[-1]["fala"] += " Os resumos e os links estão na tela."
+        if HORA_TESTE is None:
+            BRIEF_ARQ.write_text(json.dumps({"data": hoje}), "utf-8")
     pend = tarefas_pendentes_hoje()
     fala_t = (f"Você tem {len(pend)} tarefa{'s' if len(pend) != 1 else ''} pendente{'s' if len(pend) != 1 else ''} hoje: "
               + "; ".join(pend) + ".") if pend else "Você não tem tarefas pendentes hoje."
@@ -964,7 +1036,7 @@ PROJETO
  criar arquivo src\\util.py com <descrição>
  editar arquivo src\\app.py: <o que mudar>   (mostra a diferença e pede confirmação)
 TAREFAS E HORÁRIO
- resumo do dia | previsão do tempo | notícias de tecnologia | pare (para de falar)
+ resumo do dia | previsão do tempo | notícias (resumo) | manchetes (lista completa) | pare (para de falar)
  anote tarefa estudar Angular amanhã às 15h | minhas tarefas | concluir tarefa 2 | apagar tarefa 2
  que horas são | que dia é hoje | repita (repete por voz a última fala)
 PROGRAMAS
@@ -983,7 +1055,7 @@ Para salvar mudanças em arquivos, responda: confirmar (ou cancelar)."""
 
 # ------------------------------------------------------------------ roteador de comandos
 def comandos(texto):
-    t = re.sub(r"^\s*(?:" + "|".join(APELIDOS) + r")\b[\s,.:;!?-]*", "", texto.strip(), flags=re.I)
+    t = re.sub(r"^\s*(?:" + "|".join(sorted(APELIDOS, key=len, reverse=True)) + r")\b[\s,.:;!?-]*", "", texto.strip(), flags=re.I)
     if not t:
         return R("Pois não?")
     pend = ESTADO["pendente"]
@@ -1044,16 +1116,20 @@ def comandos(texto):
             return R(previsao() or "Não consegui a previsão do tempo agora. Confira a internet.")
         if re.search(r"\b(?:noticias|manchetes)\b", hp):
             quer_tech, quer_mundo = re.search(r"\b(?:tecnologia|tech)\b", hp), re.search(r"\bmundo\b", hp)
-            partes = []
-            if quer_mundo or not quer_tech:
-                lista = manchetes("mundo", 4)
-                partes += ["No mundo: " + "; ".join(lista) + "."] if lista else []
-            if quer_tech or not quer_mundo:
-                lista = manchetes("tecnologia", 4)
-                partes += ["Em tecnologia: " + "; ".join(lista) + "."] if lista else []
-            return R("\n".join(partes) if partes else "Não consegui carregar as notícias agora. Confira a internet.")
+            so_titulos = re.search(r"\b(?:manchetes|detalh\w+|lista)\b", hp)
+            partes, links = [], []
+            for cat, rotulo, quer in (("mundo", "No mundo", quer_mundo or not quer_tech),
+                                      ("tecnologia", "Em tecnologia", quer_tech or not quer_mundo)):
+                lista = noticias_itens(cat, 3) if quer else []
+                if lista:
+                    partes.append(f"{rotulo}:")
+                for x in lista:
+                    partes.append(f"{x['titulo']}." + ("" if so_titulos or not x["resumo"] else f" {x['resumo']}"))
+                    if x["link"]:
+                        links.append({"titulo": x["titulo"], "url": x["link"]})
+            return R("\n".join(partes), links) if partes else R("Não consegui carregar as notícias agora. Confira a internet.")
         if re.match(r"^(?:bom dia|boa tarde|boa noite)\b", hp):
-            return R(saudacao(periodo_do_dia(), datetime.now().hour))
+            return R(saudacao(periodo_do_dia(), hora_atual()))
     if re.search(r"\bque horas\b|\bhoras sao\b|\bme (?:diga|fala|fale) (?:a )?hora\b", hn):
         return R(f"Agora são {datetime.now():%H:%M}.")
     if re.search(r"\bque dia\b.*\bhoje\b|\bdata de hoje\b|\bque data\b|\bque dia da semana\b|\bqual (?:e )?a data\b", hn):
@@ -1154,14 +1230,19 @@ def comandos(texto):
         return R("Abri a vaga. Se tiver candidatura simplificada, é só clicar em Candidatar-se e anexar seu currículo.")
     if (m := re.search(r"abr(?:ir|a|e) (?:o |a )?(.+)", t, re.I)) and len(re.findall(r"\w+", t)) <= 6:
         alvo = m.group(1).lower()
+        for nome in APENAS_SITE:     # WhatsApp, Netflix: o Windows mostra um "atalho" que só abre a loja; vai direto ao site
+            if any(v in _sem_acento(alvo) for v in [nome] + ALIAS_SITES.get(nome, [])):
+                return abrir_site(nome, SITES[nome])
         for nome, (proto, web) in PROTOCOLOS.items():
             if nome in alvo:
-                try:
-                    os.startfile(proto)
-                    return R(f"Abrindo o {nome}.")
-                except OSError:
-                    webbrowser.open(web)
-                    return R(f"Não achei o aplicativo {nome} instalado, então abri a versão na web.")
+                if protocolo_instalado(proto):
+                    try:
+                        os.startfile(proto)
+                        return R(f"Abrindo o {nome}.")
+                    except OSError:
+                        pass
+                webbrowser.open(web)
+                return R(f"Não achei o aplicativo {nome} instalado, então abri a versão na web.")
         for nome, cmd in PROGRAMAS.items():
             if nome in alvo:
                 subprocess.Popen(cmd, shell=True)
@@ -1279,9 +1360,10 @@ def comandos(texto):
         return buscar_em(m.group(3), termo, tocar=m.group(1).startswith(("toc", "toqu", "coloc", "coloqu")))
     if len(palavras) <= 8:
         for nome, url in SITES.items():
-            verbo = rf"\b(?:abr(?:ir|a|e)|acess\w+|ir para|va para|me leve para|mostr\w+)\s+(?:(?:o|a|no|na|para|do|da|site|pagina)\s+)*{re.escape(nome)}\b"
-            if re.search(verbo, n) or (nome in n and len(palavras) <= len(nome.split()) + 1):
-                return abrir_site(nome, url)
+            for v in [nome] + ALIAS_SITES.get(nome, []):
+                verbo = rf"\b(?:abr(?:ir|a|e)|acess\w+|ir para|va para|me leve para|mostr\w+)\s+(?:(?:o|a|no|na|para|do|da|site|pagina)\s+)*{re.escape(v)}\b"
+                if re.search(verbo, n) or (v in n and len(palavras) <= len(v.split()) + 1):
+                    return abrir_site(nome, url)
         if ESTADO.get("site") and re.search(r"\b(?:abr(?:ir|a|e)|mostr\w+|acess\w+)\b.*\b(?:site|pagina|link)\b", n):
             nome, url = ESTADO["site"]
             return abrir_site(nome, url)
@@ -1431,6 +1513,8 @@ def abrir_janela():
 
 if __name__ == "__main__":
     print(f"JARVIS v2 rodando em http://localhost:{PORTA}  (Ctrl+C para sair)")
+    if HORA_TESTE is not None:
+        print(f"*** MODO TESTE: fingindo que são {HORA_TESTE}h para o briefing e as saudações ***")
     threading.Thread(target=garantir_ollama, daemon=True).start()
     threading.Thread(target=apps_iniciar, daemon=True).start()
     threading.Timer(1.2, abrir_janela).start()
